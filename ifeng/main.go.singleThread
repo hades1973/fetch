@@ -1,0 +1,45 @@
+// go build fetchAll.go
+package main
+
+import (
+	"encoding/csv"
+	"fmt"
+	"io"
+	"log"
+	"os"
+	"path"
+)
+
+const (
+	DataDir           = "/home/jns/diskD/stockdata/"
+	StockListFileName = "stocklist.csv"
+)
+
+func main() {
+	var (
+		f   *os.File
+		err error
+	)
+	f, err = os.Open(path.Join(DataDir, StockListFileName))
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer f.Close()
+	reader := csv.NewReader(f)
+	reader.Comma = ','
+	reader.FieldsPerRecord = 2
+	reader.TrimLeadingSpace = true
+
+	// 读取股票列表文件，并行爬取数据
+	for {
+		record, err := reader.Read()
+		if err == io.EOF {
+			break
+		}
+		if err != nil {
+			fmt.Println(err)
+			return
+		}
+		UpdateStockData(record[0], record[1])
+	}
+}
