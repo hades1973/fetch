@@ -4,12 +4,14 @@ import (
 	"bytes"
 	"fmt"
 	"io"
+	"io/ioutil"
 	"net/http"
 	"os"
 	"strings"
 
 	"golang.org/x/net/html"
-	iconv "gopkg.in/iconv.v1"
+	"golang.org/x/text/encoding/simplifiedchinese"
+	"golang.org/x/text/transform"
 )
 
 const (
@@ -17,7 +19,7 @@ const (
 )
 
 func main() {
-	chars, err := FetchPageGBK(url)
+	chars, err := FetchPage(url, true)
 	if err != nil {
 		return
 	}
@@ -25,7 +27,7 @@ func main() {
 	ParseHtml(bytes.NewReader(chars))
 }
 
-func FetchPageGBK(url string) ([]byte, error) {
+func FetchPage(url string, gb2312 bool) ([]byte, error) {
 	client := &http.Client{}
 	req, err := http.NewRequest("GET", url, nil)
 	if err != nil {
@@ -46,30 +48,14 @@ func FetchPageGBK(url string) ([]byte, error) {
 		return nil, err
 	}
 	defer resp.Body.Close()
-	// reader := transform.NewReader(resp.Body, simplifiedchinese.HZGB2312.NewDecoder())
-	// buf := bytes.NewBuffer(make([]byte, 1024))
-	// io.Copy(buf, reader)
 
-	// convert resp.Body from gbk to utf-8 format
-	cd, err := iconv.Open("utf-8", "gbk")
-	if err != nil {
-		fmt.Println("iconv.Open failed!")
-		return nil, err
+	var rd io.Reader
+	if gb2312 { // convert gb2312 into utf8
+		rd = transform.NewReader(resp.Body, simplifiedchinese.GBK.NewDecoder())
+	} else {
+		rd = resp.Body
 	}
-	defer cd.Close()
-
-	var bf bytes.Buffer
-	bufsize := 512
-	r := iconv.NewReader(cd, resp.Body, bufsize)
-	_, err = io.Copy(&bf, r)
-	if err != nil {
-		fmt.Println("\nio.Copy failed in fetchpage: error code: %s", err)
-		io.Copy(os.Stdin, resp.Body)
-		os.Exit(1)
-		return nil, err
-	}
-
-	return bf.Bytes(), nil
+	return ioutil.ReadAll(rd)
 }
 
 func ParseHtml(r io.Reader) {
@@ -130,6 +116,6 @@ func ParseHtml(r io.Reader) {
 		if j0 == j1 || j0 == -1 || j1 == -1 {
 			continue
 		}
-		fmt.Fprintf(os.Stdout, "%s, %s\n", li[:j0], li[j0+1:j1])
+		fmt.Fprintf(os.Stdout, "%s,%s\n", li[:j0], li[j0+1:j1])
 	}
 }
