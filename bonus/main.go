@@ -1,10 +1,10 @@
 package main
 
 import (
-	"bytes"
 	"errors"
 	"fmt"
 	"io"
+	"io/ioutil"
 	"log"
 	"net/http"
 	"os"
@@ -13,18 +13,19 @@ import (
 	"strings"
 
 	"github.com/PuerkitoBio/goquery"
-	iconv "gopkg.in/iconv.v1"
+	"golang.org/x/text/encoding/simplifiedchinese"
+	"golang.org/x/text/transform"
 )
 
 type StockBonus struct {
-	Year  string  // 分红年度
-	Base  float64 // 一般为10股
-	Song  float64 // 每Base股送多少股
-	Zeng  float64 // 每Base股转增多少股
-	Pai   float64 // 派息(元)
-	GQDJR string  // 股权登记日
-	GQJZR string  // 股权基准日
-	HGSSR string  // 红股上市日
+	Year   string  // 分红年度
+	GuJi   float64 // 一般为10股
+	SonGu  float64 // 每GuJi股送多少股
+	ZengGu float64 // 每GuJi股转增多少股
+	PaiXi  float64 // 派息(元)
+	GQDJR  string  // 股权登记日
+	GQJZR  string  // 股权基准日
+	HGSSR  string  // 红股上市日
 }
 
 const (
@@ -75,19 +76,19 @@ func main() {
 			base = ""
 		}
 		rsb.Year = r.FindString(rec[0])
-		rsb.Base, _ = strconv.ParseFloat(base, 64)
-		rsb.Song, _ = strconv.ParseFloat(song, 64)
-		rsb.Zeng, _ = strconv.ParseFloat(zhuan, 64)
-		rsb.Pai, _ = strconv.ParseFloat(pai, 64)
+		rsb.GuJi, _ = strconv.ParseFloat(base, 64)
+		rsb.SonGu, _ = strconv.ParseFloat(song, 64)
+		rsb.ZengGu, _ = strconv.ParseFloat(zhuan, 64)
+		rsb.PaiXi, _ = strconv.ParseFloat(pai, 64)
 		rsb.GQDJR = r.FindString(rec[2])
 		rsb.GQJZR = r.FindString(rec[3])
 		rsb.HGSSR = r.FindString(rec[4])
 		fmt.Printf("%v\t%v\t%v\t%v\t%v\t%v\t%v\t%v\n",
 			rsb.Year,
-			rsb.Base,
-			rsb.Song,
-			rsb.Zeng,
-			rsb.Pai,
+			rsb.GuJi,
+			rsb.SonGu,
+			rsb.ZengGu,
+			rsb.PaiXi,
 			rsb.GQDJR,
 			rsb.GQJZR,
 			rsb.HGSSR,
@@ -98,8 +99,7 @@ func main() {
 
 }
 
-func FetchPage(url string) ([]byte, error) {
-	client := &http.Client{}
+func FetchPage(url string, gb2312 bool) ([]byte, error) {
 	req, err := http.NewRequest("GET", url, nil)
 	if err != nil {
 		fmt.Println("Cant create Request obj: ", err)
@@ -107,33 +107,20 @@ func FetchPage(url string) ([]byte, error) {
 	}
 	req.Header.Add("User-Agent", "Mozilla/5.0 (Windows NT 6.1; WOW64; rv:12.0) Gecko/20100101 Firefox/12.0")
 
-	resp, err := client.Do(req)
+	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
 		fmt.Println("Req err!:", err)
 		return nil, err
 	}
 	defer resp.Body.Close()
 
-	buf := bytes.NewBuffer(make([]byte, 0))
-	io.Copy(buf, resp.Body)
-	return buf.Bytes(), nil
-}
-
-func ConvertGBKToUTF8(chars []byte) ([]byte, error) {
-	// convert resp.Body from gbk to utf-8 format
-	cd, err := iconv.Open("utf-8", "gbk")
-	if err != nil {
-		fmt.Println("iconv.Open failed!")
-		return nil, err
+	var rd io.Reader
+	if gb2312 { // convert gb2312 into utf8
+		rd = transform.NewReader(resp.Body, simplifiedchinese.GBK.NewDecoder())
+	} else {
+		rd = resp.Body
 	}
-	defer cd.Close()
-
-	var buf bytes.Buffer
-	bufsize := 512
-	r := iconv.NewReader(cd, bytes.NewReader(chars), bufsize)
-	_, err = io.Copy(&buf, r)
-
-	return buf.Bytes(), nil
+	return ioutil.ReadAll(rd)
 }
 
 func QueryHTML(r io.Reader) ([][]string, error) {
