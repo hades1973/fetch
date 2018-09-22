@@ -1,0 +1,77 @@
+package main
+
+import (
+	"bufio"
+	"database/sql"
+	"log"
+	"os"
+	"strings"
+
+	_ "github.com/go-sql-driver/mysql"
+)
+
+var db *sql.DB
+
+func main() {
+	db, _ = sql.Open("mysql", "stockadmin:1973admin@tcp(127.0.0.1:3306)/stockdb")
+	statement := "insert into stocklist (stockcode, stockname, stockmarket) values(?,?,?)"
+	{ // 将深股列表里面的股票写入数据库
+		writeRowToDB := func(s []string) {
+			if len(s) < 2 {
+				return
+			}
+			stockcode, stockname := s[5], s[6]
+			_, err := db.Exec(statement, stockcode, stockname, "sz")
+			if err != nil {
+				log.Fatalln(err)
+			}
+		}
+		DealWithCSVFile("./深股列表.csv", writeRowToDB)
+	}
+	{ // 将沪股列表里面的股票写入数据库
+		writeRowToDB2 := func(s []string) {
+			if len(s) < 2 {
+				return
+			}
+			stockcode, stockname := s[2], s[3]
+			//fmt.Println(stockcode, stockname)
+			_, err := db.Exec(statement, stockcode, stockname, "sh")
+			if err != nil {
+				log.Fatalln(err)
+			}
+		}
+		DealWithCSVFile("./沪股列表.csv", writeRowToDB2)
+	}
+}
+
+type dosthForRow func(cols []string)
+
+func DealWithCSVFile(name string, doRow dosthForRow) {
+	f, err := os.Open(name)
+	if err != nil {
+		log.Fatal(err)
+	}
+	// rd := csv.NewReader(f)
+	// rd.Comma = '\t'
+	// rd.Read()
+	// for {
+	// 	cols, err := rd.Read()
+	// 	if err != nil {
+	// 		break
+	// 	}
+	// 	doRow(cols)
+	// }
+	rd := bufio.NewReader(f)
+	rd.ReadString('\n')
+	for {
+		line, err := rd.ReadString('\n')
+		if err != nil {
+			break
+		}
+		line = line[:len(line)-1] //discard '\n'
+		cols := strings.Split(line, "\t")
+		doRow(cols)
+	}
+
+	f.Close()
+}
