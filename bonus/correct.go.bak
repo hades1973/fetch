@@ -1,0 +1,47 @@
+package main
+
+import (
+	"bufio"
+	"fmt"
+	"log"
+	"os"
+	"regexp"
+	"strings"
+)
+
+func correct() {
+	f, err := os.Open("x.sql")
+	if err != nil {
+		log.Fatalln(err)
+	}
+	fout, err := os.Create("bo.sql")
+	if err != nil {
+		f.Close()
+		log.Fatalln(err)
+	}
+	defer f.Close()
+	defer fout.Close()
+
+	r := regexp.MustCompile(`values\((\d{6})`)
+	r2 := regexp.MustCompile(`,(\d{4})(\d{2})(\d{2}),`)
+	r3 := regexp.MustCompile(`\d{4}-\d{2}-\d{2}`)
+	rd := bufio.NewReader(f)
+	for {
+		line, err := rd.ReadString('\n')
+		if err != nil {
+			break
+		}
+		line = strings.Replace(line, ",,", ",NULL,", -1)
+		line = strings.Replace(line, "JQDJR", "GQDJR", 1)
+		line = r.ReplaceAllString(line, `values('$1'`)
+		line = r2.ReplaceAllString(line, `,$1-$2-$3,`)
+		line = r3.ReplaceAllStringFunc(line, func(s string) string {
+			return fmt.Sprintf("'%s'", s)
+		})
+		//line = r3.ReplaceAllString(line, `,'$1',`)
+		if r3.FindAllString(line, -1) == nil {
+			continue
+		}
+		fmt.Fprintf(fout, "%s", line)
+	}
+}
