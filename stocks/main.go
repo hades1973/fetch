@@ -12,7 +12,7 @@ import (
 )
 
 const (
-	DataDir           = "/home/jns/diskD/stockdata/"
+	DataDir           = "./"
 	StockListFileName = "stocklist.csv"
 )
 

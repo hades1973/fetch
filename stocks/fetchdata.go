@@ -53,7 +53,9 @@ func UpdateStockData(stockcode, stockname string) {
 		}
 	}
 	fmt.Printf("Update stock \"%s\" data\n", stockname)
-	defer f.Close()
+	defer func() {
+		f.Close()
+	}()
 
 	// 从网页爬取数据
 	year, month, _ := time.Now().Date()
@@ -79,25 +81,26 @@ FETCHUPDATE:
 
 	// 从网页爬回的数据是从后先前排列期，将其逆序写入文件
 	// 需要对价格除权
-	var date string
-	var deal [7]float64 // for open,high,close,low,volumn,transaction,pow
+	// var date string
+	// var deal [7]float64 // for open,high,close,low,volumn,transaction,pow
 	for i := len(lines) - 1; i >= 0; i-- {
-		rec := strings.FieldsFunc(lines[i], func(r rune) bool {
-			if r == ',' {
-				return true
-			}
-			return false
-		})
-		date = rec[0]
-		rec = rec[1:]
-		for i, v := range rec {
-			fmt.Sscan(v, "%f", deal[i])
-		}
-		for i := 0; i < 4; i++ {
-			deal[i] /= deal[6]
-		}
-		fmt.Fprintf(f, "%s,%f,%f,%f,%f,%f,%f,%f\r\n",
-			date, deal[0], deal[1], deal[2], deal[3], deal[4], deal[5], deal[6])
+		//	rec := strings.FieldsFunc(lines[i], func(r rune) bool {
+		//		if r == ',' {
+		//			return true
+		//		}
+		//		return false
+		//	})
+		//	date = rec[0]
+		//	rec = rec[1:]
+		//	for i, v := range rec {
+		//		fmt.Sscan(v, "%f", deal[i])
+		//	}
+		//	for i := 0; i < 4; i++ {
+		//		deal[i] /= deal[6]
+		//	}
+		//	fmt.Fprintf(f, "%s,%f,%f,%f,%f,%f,%f,%f\r\n",
+		//		date, deal[0], deal[1], deal[2], deal[3], deal[4], deal[5], deal[6])
+		fmt.Fprintf(f, "%s\n", lines[i])
 	}
 
 	// 将最后交易日期写入log文件，以便更新
